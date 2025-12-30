@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "959109007404",
+    "project_id": "gecko-breeder",
+    "storage_bucket": "gecko-breeder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:959109007404:android:8dcaedc56003cdd146e989",
+        "android_client_info": {
+          "package_name": "com.example.gecko_breeder"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA35LEOUwBuGfsDZsQ3gh-Bc188xJYIxAM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
