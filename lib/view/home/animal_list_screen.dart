@@ -4,6 +4,7 @@ import '../../data/model/animal_model.dart';
 import 'animal_add_screen.dart';
 import '../../view/detail/animal_detail_screen.dart';
 import 'widget/qr_scanner_screen.dart';
+import '../breeding/breeding_screen.dart';
 
 class AnimalListScreen extends StatefulWidget {
   const AnimalListScreen({super.key});
@@ -66,6 +67,20 @@ class _AnimalListScreenState extends State<AnimalListScreen> {
         foregroundColor: Colors.black,
         elevation: 0,
         actions: [
+          // ★ 브리딩 룸 버튼 추가 (NEW)
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const BreedingScreen()));
+            },
+            icon: const Icon(Icons.favorite,
+                color: Colors.redAccent, size: 28), // 하트 아이콘
+            tooltip: "브리딩 룸",
+          ),
+          const SizedBox(width: 8),
+
           IconButton(
               onPressed: _onCameraTap,
               icon: const Icon(Icons.qr_code_scanner, size: 28)),

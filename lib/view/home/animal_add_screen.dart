@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/model/animal_model.dart';
+import 'widget/morph_selection_dialog.dart'; // ★ 모프 선택 팝업 import
 
 class AnimalAddScreen extends StatefulWidget {
   final Animal? animal;
@@ -21,18 +22,19 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
   bool _isLoading = false;
 
   late TextEditingController _nameController;
-  late TextEditingController _morphController;
   late TextEditingController _weightController;
 
-  // ★ 종 관련 변수 추가
-  late TextEditingController _customSpeciesController; // 직접 입력용
-  String _selectedSpecies = 'Leopard Gecko'; // 기본값
+  late TextEditingController _customSpeciesController;
+  String _selectedSpecies = 'Leopard Gecko';
   final List<String> _speciesOptions = [
     'Leopard Gecko',
     'Fat-tailed Gecko',
     'Crested Gecko',
     'Direct Input'
-  ]; // 선택지
+  ];
+
+  // ★ 모프 관련 변수 (텍스트 컨트롤러 대신 리스트 사용)
+  List<String> _selectedMorphList = [];
 
   String _selectedGender = 'Male';
   String _selectedStatus = 'Holdback';
@@ -48,7 +50,6 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
 
     if (widget.animal != null) {
       _nameController = TextEditingController(text: widget.animal!.name);
-      _morphController = TextEditingController(text: widget.animal!.morph);
       _weightController =
           TextEditingController(text: widget.animal!.weight.toString());
       _selectedGender = widget.animal!.gender;
@@ -56,18 +57,20 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
       _birthDate = widget.animal!.birthDate;
       _adoptDate = widget.animal!.adoptDate;
 
-      // ★ 종 데이터 불러오기 로직
+      // 종 데이터 불러오기
       if (_speciesOptions.contains(widget.animal!.species)) {
-        // 기본 목록에 있는 종이면 그대로 선택
         _selectedSpecies = widget.animal!.species;
       } else {
-        // 목록에 없는 종이면 '직접 입력'으로 설정하고 내용 채우기
         _selectedSpecies = 'Direct Input';
         _customSpeciesController.text = widget.animal!.species;
       }
+
+      // ★ 기존 모프 데이터 불러오기 (콤마로 구분된 문자열 -> 리스트로 변환)
+      if (widget.animal!.morph.isNotEmpty) {
+        _selectedMorphList = widget.animal!.morph.split(', ').toList();
+      }
     } else {
       _nameController = TextEditingController();
-      _morphController = TextEditingController();
       _weightController = TextEditingController();
     }
   }
@@ -75,21 +78,30 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _morphController.dispose();
     _weightController.dispose();
     _customSpeciesController.dispose();
     super.dispose();
   }
 
+  // ★ [기능] 모프 선택 팝업 열기
+  Future<void> _showMorphDialog() async {
+    final List<String>? result = await showDialog(
+      context: context,
+      builder: (context) =>
+          MorphSelectionDialog(selectedMorphs: _selectedMorphList),
+    );
+
+    if (result != null) {
+      setState(() {
+        _selectedMorphList = result;
+      });
+    }
+  }
+
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
-
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
-    }
+    if (pickedFile != null) setState(() => _imageFile = File(pickedFile.path));
   }
 
   Future<void> _saveAnimal() async {
@@ -107,19 +119,21 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
         downloadUrl = await storageRef.getDownloadURL();
       }
 
-      // ★ 최종 저장될 종 이름 결정
       String finalSpecies = _selectedSpecies;
       if (_selectedSpecies == 'Direct Input') {
-        if (_customSpeciesController.text.trim().isEmpty) {
+        if (_customSpeciesController.text.trim().isEmpty)
           throw Exception("종 이름을 입력해주세요.");
-        }
         finalSpecies = _customSpeciesController.text.trim();
       }
 
+      // ★ 저장 시: 리스트를 문자열로 합쳐서 저장 (예: "Mack Snow, Eclipse")
+      String finalMorphString =
+          _selectedMorphList.isEmpty ? "Normal" : _selectedMorphList.join(", ");
+
       final Map<String, dynamic> animalData = {
         'name': _nameController.text,
-        'species': finalSpecies, // ★ 수정된 종 이름 저장
-        'morph': _morphController.text,
+        'species': finalSpecies,
+        'morph': finalMorphString, // ★ 여기서 합쳐서 저장됨
         'gender': _selectedGender,
         'weight': double.tryParse(_weightController.text) ?? 0.0,
         'birthDate': Timestamp.fromDate(_birthDate),
@@ -140,16 +154,12 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
 
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(widget.animal != null ? "수정되었습니다." : "등록되었습니다.")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(widget.animal != null ? "수정되었습니다." : "등록되었습니다.")));
     } catch (e) {
-      if (mounted) {
-        // 에러 메시지 (ex: 종 이름 미입력) 보여주기
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(e.toString().replaceAll("Exception: ", ""))));
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -162,14 +172,8 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
-    if (picked != null) {
-      setState(() {
-        if (isBirth)
-          _birthDate = picked;
-        else
-          _adoptDate = picked;
-      });
-    }
+    if (picked != null)
+      setState(() => isBirth ? _birthDate = picked : _adoptDate = picked);
   }
 
   @override
@@ -179,7 +183,6 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: SafeArea(
-        // ★ 잊지 않고 SafeArea 적용!
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
@@ -189,6 +192,7 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // 이미지 영역
                       GestureDetector(
                         onTap: _pickImage,
                         child: Container(
@@ -213,16 +217,16 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
                               ? Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: const [
-                                    Icon(Icons.add_a_photo,
-                                        size: 40, color: Colors.grey),
-                                    Text("사진 변경/추가"),
-                                  ],
-                                )
+                                      Icon(Icons.add_a_photo,
+                                          size: 40, color: Colors.grey),
+                                      Text("사진 변경/추가")
+                                    ])
                               : null,
                         ),
                       ),
                       const SizedBox(height: 20),
 
+                      // 이름
                       TextFormField(
                         controller: _nameController,
                         decoration: const InputDecoration(
@@ -234,58 +238,89 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // ★ 종(Species) 선택 드롭다운
+                      // 종 선택
                       DropdownButtonFormField<String>(
                         value: _selectedSpecies,
                         decoration: const InputDecoration(
                             labelText: "종(Species)",
                             border: OutlineInputBorder(),
                             prefixIcon: Icon(Icons.category)),
-                        items: _speciesOptions.map((s) {
-                          // 화면에 보여줄 텍스트 변환 (Direct Input -> 직접 입력)
-                          String label = s;
-                          if (s == 'Direct Input') label = '직접 입력';
-                          return DropdownMenuItem(value: s, child: Text(label));
-                        }).toList(),
-                        onChanged: (val) {
-                          setState(() {
-                            _selectedSpecies = val!;
-                          });
-                        },
+                        items: _speciesOptions
+                            .map((s) => DropdownMenuItem(
+                                value: s,
+                                child: Text(s == 'Direct Input' ? '직접 입력' : s)))
+                            .toList(),
+                        onChanged: (val) =>
+                            setState(() => _selectedSpecies = val!),
                       ),
-
-                      // ★ '직접 입력' 선택 시에만 나오는 입력창
                       if (_selectedSpecies == 'Direct Input') ...[
                         const SizedBox(height: 8),
                         TextFormField(
                           controller: _customSpeciesController,
                           decoration: const InputDecoration(
-                            labelText: "종 이름 직접 입력",
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.edit),
-                            filled: true,
-                            fillColor: Color(0xFFF5F5F7),
-                          ),
-                          validator: (value) {
-                            if (_selectedSpecies == 'Direct Input' &&
-                                (value == null || value.isEmpty)) {
-                              return "종 이름을 입력해주세요.";
-                            }
-                            return null;
-                          },
+                              labelText: "종 이름 직접 입력",
+                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Color(0xFFF5F5F7)),
                         ),
                       ],
                       const SizedBox(height: 12),
 
-                      TextFormField(
-                        controller: _morphController,
-                        decoration: const InputDecoration(
-                            labelText: "모프",
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.palette)),
+                      // ★★★ 모프 멀티 선택 UI (변경된 부분) ★★★
+                      const Text("모프 / 유전 정보 (Morphs)",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87)),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: _showMorphDialog, // 누르면 팝업 열림
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.palette, color: Colors.grey),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                // 선택된 모프가 없으면 안내 문구, 있으면 칩(태그)으로 표시
+                                child: _selectedMorphList.isEmpty
+                                    ? const Text("모프를 선택해주세요 (터치)",
+                                        style: TextStyle(color: Colors.black54))
+                                    : Wrap(
+                                        spacing: 6,
+                                        runSpacing: 0,
+                                        children:
+                                            _selectedMorphList.map((morph) {
+                                          return Chip(
+                                            label: Text(morph,
+                                                style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: Colors.white)),
+                                            backgroundColor: Colors.deepOrange,
+                                            deleteIcon: const Icon(Icons.close,
+                                                size: 14, color: Colors.white),
+                                            onDeleted: () {
+                                              setState(() {
+                                                _selectedMorphList
+                                                    .remove(morph);
+                                              });
+                                            },
+                                          );
+                                        }).toList(),
+                                      ),
+                              ),
+                              const Icon(Icons.arrow_drop_down),
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
 
+                      // 무게
                       TextFormField(
                         controller: _weightController,
                         keyboardType: TextInputType.number,
@@ -296,32 +331,43 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      DropdownButtonFormField<String>(
-                        value: _selectedGender,
-                        decoration: const InputDecoration(
-                            labelText: "성별", border: OutlineInputBorder()),
-                        items: ['Male', 'Female', 'Unknown']
-                            .map((g) =>
-                                DropdownMenuItem(value: g, child: Text(g)))
-                            .toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedGender = val!),
-                      ),
-                      const SizedBox(height: 12),
-
-                      DropdownButtonFormField<String>(
-                        value: _selectedStatus,
-                        decoration: const InputDecoration(
-                            labelText: "상태", border: OutlineInputBorder()),
-                        items: ['Breeding', 'Holdback', 'For Sale', 'Pet']
-                            .map((s) =>
-                                DropdownMenuItem(value: s, child: Text(s)))
-                            .toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedStatus = val!),
+                      // 성별 & 상태
+                      Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedGender,
+                              decoration: const InputDecoration(
+                                  labelText: "성별",
+                                  border: OutlineInputBorder()),
+                              items: ['Male', 'Female', 'Unknown']
+                                  .map((g) => DropdownMenuItem(
+                                      value: g, child: Text(g)))
+                                  .toList(),
+                              onChanged: (val) =>
+                                  setState(() => _selectedGender = val!),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: DropdownButtonFormField<String>(
+                              value: _selectedStatus,
+                              decoration: const InputDecoration(
+                                  labelText: "상태",
+                                  border: OutlineInputBorder()),
+                              items: ['Breeding', 'Holdback', 'For Sale', 'Pet']
+                                  .map((s) => DropdownMenuItem(
+                                      value: s, child: Text(s)))
+                                  .toList(),
+                              onChanged: (val) =>
+                                  setState(() => _selectedStatus = val!),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 20),
 
+                      // 날짜
                       Row(children: [
                         Expanded(
                             child: OutlinedButton.icon(

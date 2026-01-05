@@ -16,6 +16,7 @@ import '../home/animal_add_screen.dart';
 import 'widget/detail_widgets.dart';
 import 'widget/qr_dialog.dart';
 import 'widget/photo_view_screen.dart';
+import 'widget/breeding_history_full_screen.dart'; // ★ 전체 기록 화면 import
 
 class AnimalDetailScreen extends StatefulWidget {
   final Animal animal;
@@ -81,18 +82,15 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
     }
   }
 
-  // [기능 1] 대표 사진 변경 (NEW)
+  // [기능 1] 대표 사진 변경
   Future<void> _setProfilePhoto(String photoUrl) async {
     try {
-      // 1. DB 업데이트
       await FirebaseFirestore.instance
           .collection('animals')
           .doc(_currentAnimal.id)
           .update({'photoUrl': photoUrl});
 
-      // 2. 현재 화면 상태 업데이트 (즉시 반영)
       setState(() {
-        // 기존 데이터를 유지하되 사진 URL만 교체한 새로운 객체 생성
         _currentAnimal = Animal(
           id: _currentAnimal.id,
           name: _currentAnimal.name,
@@ -103,12 +101,12 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
           birthDate: _currentAnimal.birthDate,
           adoptDate: _currentAnimal.adoptDate,
           status: _currentAnimal.status,
-          photoUrl: photoUrl, // ★ 교체됨
+          photoUrl: photoUrl,
         );
       });
 
       if (mounted) {
-        Navigator.pop(context); // 메뉴 닫기
+        Navigator.pop(context);
         ScaffoldMessenger.of(context)
             .showSnackBar(const SnackBar(content: Text("대표 사진이 변경되었습니다!")));
       }
@@ -118,7 +116,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
     }
   }
 
-  // [기능 2] 갤러리 사진 삭제 (NEW)
+  // [기능 2] 갤러리 사진 삭제
   Future<void> _deleteGalleryPhoto(String docId) async {
     try {
       await FirebaseFirestore.instance
@@ -375,6 +373,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // 1. 네임텍
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       child: Row(
@@ -398,6 +397,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                     ),
                     const SizedBox(height: 24),
 
+                    // 2. 정보 카드
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -422,6 +422,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                     ),
                     const SizedBox(height: 24),
 
+                    // 3. History
                     const Text("  History",
                         style: TextStyle(
                             fontSize: 18,
@@ -447,11 +448,15 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // ★ 1. 캘린더를 위로 이동
+                    // ★ 4. [New] 브리딩 이력 버튼 (수정됨)
+                    _buildBreedingHistory(),
+                    const SizedBox(height: 24),
+
+                    // 5. 캘린더
                     _buildUnifiedCalendar(),
                     const SizedBox(height: 24),
 
-                    // ★ 2. 성장 앨범을 아래로 이동 (수정됨: 날짜표시 + 메인설정 기능)
+                    // 6. 성장 앨범
                     _buildGallerySection(),
 
                     const SizedBox(height: 40),
@@ -474,6 +479,63 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ★ 브리딩 이력 버튼 (리스트 -> 버튼 형태로 변경됨)
+  Widget _buildBreedingHistory() {
+    // 성별이 명확하지 않으면(Unknown) 안 보여줌
+    if (_currentAnimal.gender != 'Male' && _currentAnimal.gender != 'Female') {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        // 아이콘 (빨간 하트)
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.redAccent.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Icons.favorite, color: Colors.redAccent, size: 24),
+        ),
+        // 제목
+        title: const Text(
+          "Breeding History",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        // 설명
+        subtitle: Text(
+          "이 개체의 브리딩/산란 기록 보기",
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+        ),
+        // 화살표
+        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+
+        // ★ 클릭 시 전체 리스트 화면으로 이동
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  BreedingHistoryFullScreen(animal: _currentAnimal),
+            ),
+          );
+        },
       ),
     );
   }
@@ -507,7 +569,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
         ),
         const SizedBox(height: 10),
         SizedBox(
-          height: 130, // 날짜 표시를 위해 높이 약간 증가
+          height: 130,
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('animals')
@@ -529,7 +591,6 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                           style: TextStyle(color: Colors.grey.shade400))),
                 );
               }
-
               final docs = snapshot.data!.docs;
               return ListView.separated(
                 scrollDirection: Axis.horizontal,
@@ -540,13 +601,10 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                   final photoData = PhotoModel.fromJson(
                       docs[index].data() as Map<String, dynamic>,
                       docs[index].id);
-                  // 날짜 포맷 (예: 24.05.21)
                   final String dateStr =
                       DateFormat('yy.MM.dd').format(photoData.uploadedAt);
-
                   return GestureDetector(
                     onTap: () {
-                      // ★ 사진 누르면 메뉴 띄우기 (메인 사진 설정 기능)
                       showModalBottomSheet(
                         context: context,
                         builder: (context) => SafeArea(
@@ -554,34 +612,33 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               ListTile(
-                                leading: const Icon(Icons.fullscreen),
-                                title: const Text('크게 보기'),
-                                onTap: () {
-                                  Navigator.pop(context);
-                                  Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) => PhotoViewScreen(
-                                              photoUrl: photoData.photoUrl)));
-                                },
-                              ),
+                                  leading: const Icon(Icons.fullscreen),
+                                  title: const Text('크게 보기'),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                PhotoViewScreen(
+                                                    photoUrl:
+                                                        photoData.photoUrl)));
+                                  }),
                               ListTile(
-                                leading: const Icon(Icons.photo_camera_front,
-                                    color: Colors.deepOrange),
-                                title: const Text('대표 사진으로 설정'),
-                                onTap: () {
-                                  _setProfilePhoto(photoData.photoUrl);
-                                },
-                              ),
+                                  leading: const Icon(Icons.photo_camera_front,
+                                      color: Colors.deepOrange),
+                                  title: const Text('대표 사진으로 설정'),
+                                  onTap: () {
+                                    _setProfilePhoto(photoData.photoUrl);
+                                  }),
                               ListTile(
-                                leading:
-                                    const Icon(Icons.delete, color: Colors.red),
-                                title: const Text('삭제'),
-                                textColor: Colors.red,
-                                onTap: () {
-                                  _deleteGalleryPhoto(docs[index].id);
-                                },
-                              ),
+                                  leading: const Icon(Icons.delete,
+                                      color: Colors.red),
+                                  title: const Text('삭제'),
+                                  textColor: Colors.red,
+                                  onTap: () {
+                                    _deleteGalleryPhoto(docs[index].id);
+                                  }),
                             ],
                           ),
                         ),
@@ -590,40 +647,32 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                     child: Stack(
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: CachedNetworkImage(
-                            imageUrl: photoData.photoUrl,
-                            width: 120,
-                            height: 120,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) =>
-                                Container(color: Colors.grey.shade200),
-                            errorWidget: (context, url, error) =>
-                                const Icon(Icons.error),
-                          ),
-                        ),
-                        // ★ 날짜 표시 오버레이
+                            borderRadius: BorderRadius.circular(16),
+                            child: CachedNetworkImage(
+                                imageUrl: photoData.photoUrl,
+                                width: 120,
+                                height: 120,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) =>
+                                    Container(color: Colors.grey.shade200),
+                                errorWidget: (context, url, error) =>
+                                    const Icon(Icons.error))),
                         Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: const BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(10),
-                                  bottomRight: Radius.circular(16)),
-                            ),
-                            child: Text(
-                              dateStr,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ),
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: const BoxDecoration(
+                                    color: Colors.black54,
+                                    borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(10),
+                                        bottomRight: Radius.circular(16))),
+                                child: Text(dateStr,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold)))),
                       ],
                     ),
                   );
@@ -668,21 +717,19 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text("Care Calendar",
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    IconButton(
-                        onPressed: _showAddLogDialog,
-                        icon: const Icon(Icons.add_circle,
-                            color: Colors.deepOrange, size: 32),
-                        tooltip: "기록 추가"),
-                  ],
-                ),
-              ),
+                  padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
+                  child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Care Calendar",
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold)),
+                        IconButton(
+                            onPressed: _showAddLogDialog,
+                            icon: const Icon(Icons.add_circle,
+                                color: Colors.deepOrange, size: 32),
+                            tooltip: "기록 추가")
+                      ])),
               TableCalendar(
                 firstDay: DateTime.utc(2020, 1, 1),
                 lastDay: DateTime.utc(2030, 12, 31),
