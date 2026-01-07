@@ -26,6 +26,10 @@ dependencies:
   photo_view: ^0.14.0   # 사진 확대/축소 보기 기능
   cached_network_image: ^3.3.0 # 인터넷 사진을 부드럽게 로딩하고 캐싱
   
+  # 인쇄 관련 패키지 (중복 제거됨!)
+  printing: ^5.13.1
+  pdf: ^3.11.3
+  
   # 기본 아이콘
   cupertino_icons: ^1.0.6
 
@@ -36,4 +40,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  

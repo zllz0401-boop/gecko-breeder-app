@@ -3,8 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../data/model/pairing_model.dart';
 import '../../data/model/clutch_model.dart';
-import '../../data/model/animal_model.dart'; // ★ 부모 정보 조회를 위해 추가
-import 'genetic_calculator_screen.dart'; // ★ 계산기 화면 import
+import '../../data/model/animal_model.dart';
+import '../../service/print_service.dart';
+import 'genetic_calculator_screen.dart';
+import 'label_preview_screen.dart';
+import 'clutch_detail_screen.dart';
 
 class PairingDetailScreen extends StatefulWidget {
   final Pairing pairing;
@@ -16,14 +19,16 @@ class PairingDetailScreen extends StatefulWidget {
 }
 
 class _PairingDetailScreenState extends State<PairingDetailScreen> {
-  // [기능 1] 산란 기록 추가 팝업 (중복 방지 적용됨)
+  // [기능 1] 산란 기록 추가 팝업 (온도 입력 추가됨)
   void _showAddClutchDialog(int nextOrder) {
     DateTime layDate = DateTime.now();
     final TextEditingController countController =
         TextEditingController(text: "2");
+    final TextEditingController tempController =
+        TextEditingController(text: "26.5"); // 기본값 26.5도
     final TextEditingController memoController = TextEditingController();
 
-    bool isSaving = false; // 로딩 상태
+    bool isSaving = false;
 
     showDialog(
       context: context,
@@ -32,42 +37,66 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
         builder: (context, setDialogState) {
           return AlertDialog(
             title: Text("$nextOrder차 산란 기록"),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  title:
-                      Text("산란일: ${DateFormat('yyyy-MM-dd').format(layDate)}"),
-                  trailing: const Icon(Icons.calendar_today),
-                  contentPadding: EdgeInsets.zero,
-                  onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: layDate,
-                      firstDate: widget.pairing.startDate,
-                      lastDate: DateTime.now(),
-                    );
-                    if (picked != null) setDialogState(() => layDate = picked);
-                  },
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: countController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                      labelText: "알 개수 (개)",
-                      border: OutlineInputBorder(),
-                      isDense: true),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: memoController,
-                  decoration: const InputDecoration(
-                      labelText: "메모 (예: 1유정 1무정)",
-                      border: OutlineInputBorder(),
-                      isDense: true),
-                ),
-              ],
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    title: Text(
+                        "산란일: ${DateFormat('yyyy-MM-dd').format(layDate)}"),
+                    trailing: const Icon(Icons.calendar_today),
+                    contentPadding: EdgeInsets.zero,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: layDate,
+                        firstDate: widget.pairing.startDate,
+                        lastDate: DateTime.now(),
+                      );
+                      if (picked != null)
+                        setDialogState(() => layDate = picked);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: countController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                              labelText: "알 개수",
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              suffixText: "개"),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // ★ [추가됨] 온도 입력 필드
+                      Expanded(
+                        child: TextField(
+                          controller: tempController,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          decoration: const InputDecoration(
+                              labelText: "보관 온도",
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                              suffixText: "°C"),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: memoController,
+                    decoration: const InputDecoration(
+                        labelText: "메모 (예: 1유정 1무정)",
+                        border: OutlineInputBorder(),
+                        isDense: true),
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -77,29 +106,10 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
                 onPressed: isSaving
                     ? null
                     : () async {
-                        setDialogState(() => isSaving = true); // 버튼 비활성화
+                        setDialogState(() => isSaving = true);
 
                         try {
-                          // DB 중복 체크
-                          final checkQuery = await FirebaseFirestore.instance
-                              .collection('pairings')
-                              .doc(widget.pairing.id)
-                              .collection('clutches')
-                              .where('order', isEqualTo: nextOrder)
-                              .get();
-
-                          if (checkQuery.docs.isNotEmpty) {
-                            if (mounted) {
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content: Text(
-                                          "이미 $nextOrder차 산란 기록이 존재합니다.")));
-                            }
-                            return;
-                          }
-
-                          // 저장 실행
+                          // 저장 로직
                           await FirebaseFirestore.instance
                               .collection('pairings')
                               .doc(widget.pairing.id)
@@ -109,6 +119,8 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
                             'order': nextOrder,
                             'layDate': Timestamp.fromDate(layDate),
                             'eggCount': int.tryParse(countController.text) ?? 0,
+                            'incubationTemp':
+                                double.tryParse(tempController.text), // ★ 온도 저장
                             'memo': memoController.text,
                             'created_at': FieldValue.serverTimestamp(),
                           });
@@ -168,9 +180,8 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
     }
   }
 
-  // ★ [기능 3] 부모 정보 로딩 및 계산기 이동 (새로 추가됨)
+  // [기능 3] 2세 예측 계산기 열기
   Future<void> _openGeneticCalculator() async {
-    // 1. 로딩 표시
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -178,7 +189,6 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
     );
 
     try {
-      // 2. 부모(수컷, 암컷) 정보 DB에서 가져오기
       final maleDoc = await FirebaseFirestore.instance
           .collection('animals')
           .doc(widget.pairing.maleId)
@@ -194,7 +204,6 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
       final male = Animal.fromJson(maleDoc.data()!, maleDoc.id);
       final female = Animal.fromJson(femaleDoc.data()!, femaleDoc.id);
 
-      // 모프 문자열 -> 리스트 변환 (예: "Mack Snow, Eclipse" -> ["Mack Snow", "Eclipse"])
       List<String> maleMorphs = male.morph.isEmpty || male.morph == 'Normal'
           ? []
           : male.morph.split(', ');
@@ -204,8 +213,7 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
               : female.morph.split(', ');
 
       if (mounted) {
-        Navigator.pop(context); // 로딩 닫기
-        // 3. 계산기 화면으로 이동
+        Navigator.pop(context);
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -220,7 +228,7 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // 로딩 닫기
+        Navigator.pop(context);
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text("오류: $e")));
       }
@@ -246,7 +254,6 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // 1. 커플 정보 카드 (헤더)
             Container(
               padding: const EdgeInsets.all(20),
               color: Colors.white,
@@ -273,16 +280,12 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
                     style: const TextStyle(
                         color: Colors.grey, fontWeight: FontWeight.bold),
                   ),
-
                   const SizedBox(height: 16),
-
-                  // ★ [추가] 2세 예측 버튼
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: _openGeneticCalculator,
-                      icon: const Icon(Icons.science,
-                          color: Colors.white), // 과학 아이콘
+                      icon: const Icon(Icons.science, color: Colors.white),
                       label: const Text("2세 모프 예측하기 (Genetic Calculator)"),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.indigoAccent,
@@ -296,8 +299,6 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
                 ],
               ),
             ),
-
-            // 2. 산란 기록 리스트 (Clutch List)
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
@@ -327,51 +328,84 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
                       final clutch = Clutch.fromJson(
                           docs[index].data() as Map<String, dynamic>,
                           docs[index].id);
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.grey.withOpacity(0.1),
-                                blurRadius: 5)
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            // 차수 배지
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.deepOrange.shade50,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text("${clutch.order}차",
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.deepOrange)),
-                            ),
-                            const SizedBox(width: 16),
-                            // 정보
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                      "${DateFormat('yyyy.MM.dd').format(clutch.layDate)} 산란",
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16)),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                      "🥚 ${clutch.eggCount}개  |  ${clutch.memo ?? ''}",
-                                      style: TextStyle(
-                                          color: Colors.grey.shade600)),
-                                ],
+
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ClutchDetailScreen(
+                                pairing: widget.pairing,
+                                clutch: clutch,
                               ),
                             ),
-                          ],
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.grey.withOpacity(0.1),
+                                  blurRadius: 5)
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.deepOrange.shade50,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text("${clutch.order}차",
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.deepOrange)),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                        "${DateFormat('yyyy.MM.dd').format(clutch.layDate)} 산란",
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16)),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                        "🥚 ${clutch.eggCount}개  |  ${clutch.memo ?? ''}",
+                                        style: TextStyle(
+                                            color: Colors.grey.shade600)),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => LabelPreviewScreen(
+                                        maleName: widget.pairing.maleName,
+                                        femaleName: widget.pairing.femaleName,
+                                        order: clutch.order,
+                                        pairingDate: widget.pairing.startDate,
+                                        layDate: clutch.layDate,
+                                        eggCount: clutch.eggCount,
+                                        memo: clutch.memo ?? '',
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.print,
+                                    color: Colors.indigo),
+                                tooltip: "라벨 출력",
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
@@ -382,8 +416,6 @@ class _PairingDetailScreenState extends State<PairingDetailScreen> {
           ],
         ),
       ),
-
-      // 3. 산란 추가 버튼
       floatingActionButton: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('pairings')

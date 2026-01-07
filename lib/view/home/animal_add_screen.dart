@@ -55,7 +55,7 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
       _selectedGender = widget.animal!.gender;
       _selectedStatus = widget.animal!.status;
       _birthDate = widget.animal!.birthDate;
-      _adoptDate = widget.animal!.adoptDate;
+      _adoptDate = widget.animal!.adoptionDate;
 
       // 종 데이터 불러오기
       if (_speciesOptions.contains(widget.animal!.species)) {
@@ -121,8 +121,9 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
 
       String finalSpecies = _selectedSpecies;
       if (_selectedSpecies == 'Direct Input') {
-        if (_customSpeciesController.text.trim().isEmpty)
+        if (_customSpeciesController.text.trim().isEmpty) {
           throw Exception("종 이름을 입력해주세요.");
+        }
         finalSpecies = _customSpeciesController.text.trim();
       }
 
@@ -157,9 +158,10 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(widget.animal != null ? "수정되었습니다." : "등록되었습니다.")));
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(e.toString().replaceAll("Exception: ", ""))));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -172,8 +174,9 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
-    if (picked != null)
+    if (picked != null) {
       setState(() => isBirth ? _birthDate = picked : _adoptDate = picked);
+    }
   }
 
   @override
@@ -214,9 +217,9 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
                           ),
                           child: (_imageFile == null &&
                                   widget.animal?.photoUrl == null)
-                              ? Column(
+                              ? const Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
+                                  children: [
                                       Icon(Icons.add_a_photo,
                                           size: 40, color: Colors.grey),
                                       Text("사진 변경/추가")
@@ -240,7 +243,7 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
 
                       // 종 선택
                       DropdownButtonFormField<String>(
-                        value: _selectedSpecies,
+                        initialValue: _selectedSpecies,
                         decoration: const InputDecoration(
                             labelText: "종(Species)",
                             border: OutlineInputBorder(),
@@ -336,7 +339,7 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _selectedGender,
+                              initialValue: _selectedGender,
                               decoration: const InputDecoration(
                                   labelText: "성별",
                                   border: OutlineInputBorder()),
@@ -351,7 +354,7 @@ class _AnimalAddScreenState extends State<AnimalAddScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: DropdownButtonFormField<String>(
-                              value: _selectedStatus,
+                              initialValue: _selectedStatus,
                               decoration: const InputDecoration(
                                   labelText: "상태",
                                   border: OutlineInputBorder()),

@@ -26,13 +26,14 @@ class BreedingScreen extends StatelessWidget {
               .orderBy('created_at', descending: true)
               .snapshots(),
           builder: (context, snapshot) {
-            if (!snapshot.hasData)
+            if (!snapshot.hasData) {
               return const Center(child: CircularProgressIndicator());
+            }
             if (snapshot.data!.docs.isEmpty) {
-              return Center(
+              return const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Icon(Icons.favorite_border, size: 60, color: Colors.grey),
                     SizedBox(height: 16),
                     Text("진행 중인 페어링이 없습니다.",

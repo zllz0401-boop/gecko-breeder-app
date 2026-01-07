@@ -91,12 +91,14 @@ class _AnimalListScreenState extends State<AnimalListScreen> {
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance.collection('animals').snapshots(),
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting)
+            if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
-            if (!snapshot.hasData || snapshot.data!.docs.isEmpty)
+            }
+            if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
               return const Center(
                   child: Text("등록된 개체가 없습니다.",
                       style: TextStyle(color: Colors.grey)));
+            }
 
             final docs = snapshot.data!.docs;
 
@@ -110,9 +112,9 @@ class _AnimalListScreenState extends State<AnimalListScreen> {
 
                 // 성별 색상 설정
                 Color genderColor = Colors.grey;
-                if (animal.gender == 'Male')
+                if (animal.gender == 'Male') {
                   genderColor = Colors.blue;
-                else if (animal.gender == 'Female') genderColor = Colors.pink;
+                } else if (animal.gender == 'Female') genderColor = Colors.pink;
 
                 return GestureDetector(
                   onTap: () {

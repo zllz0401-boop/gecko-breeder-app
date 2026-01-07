@@ -9,14 +9,14 @@ import 'package:uuid/uuid.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../data/model/animal_model.dart';
-import '../../data/model/log_model.dart';
+import '../../data/model/log_model.dart'; // LogRecord 모델 필요
 import '../../data/model/photo_model.dart';
 
 import '../home/animal_add_screen.dart';
-import 'widget/detail_widgets.dart';
+import 'widget/detail_widgets.dart'; // DetailBadge, DetailInfoRow 등
 import 'widget/qr_dialog.dart';
 import 'widget/photo_view_screen.dart';
-import 'widget/breeding_history_full_screen.dart'; // ★ 전체 기록 화면 import
+import 'widget/breeding_history_full_screen.dart';
 
 class AnimalDetailScreen extends StatefulWidget {
   final Animal animal;
@@ -39,7 +39,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
     _currentAnimal = widget.animal;
   }
 
-  // [기능 0] 사진 업로드
+  // [기능 0] 사진 업로드 (기존 코드 유지)
   Future<void> _uploadGalleryPhoto() async {
     final picker = ImagePicker();
     final pickedFile =
@@ -82,7 +82,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
     }
   }
 
-  // [기능 1] 대표 사진 변경
+  // [기능 1] 대표 사진 변경 (기존 코드 유지)
   Future<void> _setProfilePhoto(String photoUrl) async {
     try {
       await FirebaseFirestore.instance
@@ -99,9 +99,15 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
           gender: _currentAnimal.gender,
           weight: _currentAnimal.weight,
           birthDate: _currentAnimal.birthDate,
-          adoptDate: _currentAnimal.adoptDate,
+          adoptionDate: _currentAnimal
+              .adoptionDate, // adoptDate -> adoptionDate (모델명 확인 필요)
           status: _currentAnimal.status,
           photoUrl: photoUrl,
+          fatherName: _currentAnimal.fatherName, // 부모 정보 유지
+          motherName: _currentAnimal.motherName,
+          fatherId: _currentAnimal.fatherId,
+          motherId: _currentAnimal.motherId,
+          memo: _currentAnimal.memo,
         );
       });
 
@@ -116,7 +122,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
     }
   }
 
-  // [기능 2] 갤러리 사진 삭제
+  // [기능 2] 갤러리 사진 삭제 (기존 코드 유지)
   Future<void> _deleteGalleryPhoto(String docId) async {
     try {
       await FirebaseFirestore.instance
@@ -149,6 +155,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
     }
   }
 
+  // [기능 3] 통합 로그 추가 다이얼로그 (기존 코드 유지)
   void _showAddLogDialog() {
     final TextEditingController amountController = TextEditingController();
     final TextEditingController weightController = TextEditingController();
@@ -191,8 +198,9 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                                   selected: selectedFood == food,
                                   selectedColor: Colors.deepOrange.shade100,
                                   onSelected: (selected) {
-                                    if (selected)
+                                    if (selected) {
                                       setDialogState(() => selectedFood = food);
+                                    }
                                   });
                             }).toList()),
                         TextField(
@@ -274,8 +282,23 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                                     .collection('animals')
                                     .doc(_currentAnimal.id)
                                     .update({'weight': newWeight});
-                                setState(
-                                    () => _currentAnimal.weight = newWeight);
+                                setState(() => _currentAnimal = Animal(
+                                      id: _currentAnimal.id,
+                                      name: _currentAnimal.name,
+                                      species: _currentAnimal.species,
+                                      morph: _currentAnimal.morph,
+                                      gender: _currentAnimal.gender,
+                                      weight: newWeight, // 업데이트
+                                      birthDate: _currentAnimal.birthDate,
+                                      adoptionDate: _currentAnimal.adoptionDate,
+                                      status: _currentAnimal.status,
+                                      photoUrl: _currentAnimal.photoUrl,
+                                      fatherName: _currentAnimal.fatherName,
+                                      motherName: _currentAnimal.motherName,
+                                      fatherId: _currentAnimal.fatherId,
+                                      motherId: _currentAnimal.motherId,
+                                      memo: _currentAnimal.memo,
+                                    ));
                               }
                             }
                             if (mounted) Navigator.pop(context);
@@ -304,8 +327,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
     showDialog(
         context: context,
         builder: (context) => QrDialog(
-            animalName: _currentAnimal.name,
-            animalId: _currentAnimal.id ?? "error"));
+            animalName: _currentAnimal.name, animalId: _currentAnimal.id));
   }
 
   void _deleteAnimal() async {
@@ -356,7 +378,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
               ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Hero(
-                  tag: _currentAnimal.id ?? 'hero',
+                  tag: _currentAnimal.id,
                   child: _currentAnimal.photoUrl != null
                       ? Image.network(_currentAnimal.photoUrl!,
                           fit: BoxFit.cover)
@@ -397,7 +419,7 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // 2. 정보 카드
+                    // 2. 정보 카드 (여기에 Lineage 추가)
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -417,7 +439,77 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                         DetailInfoRow(
                             icon: Icons.monitor_weight,
                             title: "Weight",
-                            value: "${_currentAnimal.weight}g")
+                            value: "${_currentAnimal.weight}g"),
+
+                        // ★ [추가됨] 부모 정보 표시 영역 (Lineage)
+                        if (_currentAnimal.fatherName != null ||
+                            _currentAnimal.motherName != null) ...[
+                          const Divider(height: 30, thickness: 0.5),
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Padding(
+                              padding: EdgeInsets.only(bottom: 8.0),
+                              child: Text("Lineage (Parents)",
+                                  style: TextStyle(
+                                      color: Colors.grey,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12)),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      const Text("Father",
+                                          style: TextStyle(
+                                              color: Colors.blue,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 10)),
+                                      const SizedBox(height: 2),
+                                      Text(_currentAnimal.fatherName ?? "-",
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13),
+                                          overflow: TextOverflow.ellipsis),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.pink.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      const Text("Mother",
+                                          style: TextStyle(
+                                              color: Colors.pink,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 10)),
+                                      const SizedBox(height: 2),
+                                      Text(_currentAnimal.motherName ?? "-",
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13),
+                                          overflow: TextOverflow.ellipsis),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        ]
                       ]),
                     ),
                     const SizedBox(height: 24),
@@ -442,21 +534,66 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
                         const SizedBox(height: 20),
                         DetailDateRow(
                             title: "Adoption",
-                            date: _currentAnimal.adoptDate,
+                            date: _currentAnimal.adoptionDate,
                             icon: Icons.home)
                       ]),
                     ),
                     const SizedBox(height: 24),
 
-                    // ★ 4. [New] 브리딩 이력 버튼 (수정됨)
-                    _buildBreedingHistory(),
+                    // 4. 브리딩 이력 버튼 (원본 코드 디자인)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.grey.withOpacity(0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4))
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 8),
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.favorite,
+                              color: Colors.redAccent, size: 24),
+                        ),
+                        title: const Text(
+                          "Breeding History",
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          "이 개체의 브리딩/산란 기록 보기",
+                          style: TextStyle(
+                              color: Colors.grey.shade500, fontSize: 12),
+                        ),
+                        trailing:
+                            const Icon(Icons.chevron_right, color: Colors.grey),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => BreedingHistoryFullScreen(
+                                  animal: _currentAnimal),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                     const SizedBox(height: 24),
 
-                    // 5. 캘린더
+                    // 5. 캘린더 (원본 코드 유지)
                     _buildUnifiedCalendar(),
                     const SizedBox(height: 24),
 
-                    // 6. 성장 앨범
+                    // 6. 성장 앨범 (원본 코드 유지)
                     _buildGallerySection(),
 
                     const SizedBox(height: 40),
@@ -479,63 +616,6 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // ★ 브리딩 이력 버튼 (리스트 -> 버튼 형태로 변경됨)
-  Widget _buildBreedingHistory() {
-    // 성별이 명확하지 않으면(Unknown) 안 보여줌
-    if (_currentAnimal.gender != 'Male' && _currentAnimal.gender != 'Female') {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        // 아이콘 (빨간 하트)
-        leading: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.redAccent.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.favorite, color: Colors.redAccent, size: 24),
-        ),
-        // 제목
-        title: const Text(
-          "Breeding History",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        // 설명
-        subtitle: Text(
-          "이 개체의 브리딩/산란 기록 보기",
-          style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-        ),
-        // 화살표
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-
-        // ★ 클릭 시 전체 리스트 화면으로 이동
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  BreedingHistoryFullScreen(animal: _currentAnimal),
-            ),
-          );
-        },
       ),
     );
   }
@@ -703,9 +783,10 @@ class _AnimalDetailScreenState extends State<AnimalDetailScreen> {
             .collection('logs')
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const SizedBox(
                 height: 300, child: Center(child: CircularProgressIndicator()));
+          }
           final docs = snapshot.data!.docs;
           final logs = docs
               .map((doc) => LogRecord.fromJson(
